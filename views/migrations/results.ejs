@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("../partials/head") %>
+  <title>Migration #<%= migration.id %></title>
+</head>
+<body>
+  <%- include("../partials/nav") %>
+
+  <%
+    var completed = migration.status === "completed";
+    var failedRun = migration.status === "failed";
+    var demo = migration.type === "demo";
+    var filesGone = Boolean(migration.files_deleted_at);
+    var cleanupRunning = cleanup && cleanup.status === "running";
+    var cleanupDone = cleanup && (cleanup.status === "done" || cleanup.status === "partial");
+    var adminBase = "https://admin.shopify.com/store/" + shop.replace(".myshopify.com", "");
+  %>
+
+  <main class="page">
+    <button class="back-link" type="button" data-navigate="/migrations"><%- include("../partials/icon", { name: "arrow-left", size: 14 }) %> Migrations</button>
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">
+          Migration #<%= migration.id %>
+          <%- include("../partials/status", { value: migration.status }) %>
+          <% if (migration.type !== "full") { %><span class="badge badge--brand"><%= h.TYPE[migration.type] %></span><% } %>
+        </h1>
+        <p class="page-header__sub">
+          <%= h.platformName(migration.platform) %> · <%= h.host(migration.base_url) %>
+          <%- include("../partials/icon", { name: "arrow-right", size: 13 }) %> <%= shop %>
+          <% if (migration.parent_migration_id) { %>· from <button class="link" type="button" data-navigate="/migrations/<%= migration.parent_migration_id %>">#<%= migration.parent_migration_id %></button><% } %>
+        </p>
+      </div>
+      <div class="page-header__actions">
+        <a class="btn btn--primary" href="<%= adminBase %>/products" target="_top">
+          View in Shopify <%- include("../partials/icon", { name: "external", size: 14 }) %>
+        </a>
+      </div>
+    </header>
+
+    <div class="stack">
+      <%- include("../partials/pageError") %>
+
+      <% if (completed) { %>
+        <div class="banner banner--success">
+          <%- include("../partials/icon", { name: "check-circle" }) %>
+          <div class="banner__body">
+            <strong>Finished<%= durationSeconds ? " in " + h.duration(durationSeconds) : "" %></strong> —
+            <%= h.number(progress.succeeded) %> records migrated<%= progress.failed ? ", " + h.number(progress.failed) + " need attention" : "" %>.
+            <% if (demo) { %>Check them in your Shopify admin, then run the full migration.<% } %>
+          </div>
+        </div>
+      <% } else if (failedRun) { %>
+        <div class="banner banner--critical">
+          <%- include("../partials/icon", { name: "alert" }) %>
+          <div class="banner__body">
+            <div class="banner__title">The migration stopped</div>
+            <div><%= migration.last_error || "Something went wrong." %></div>
+            <div class="banner__actions">
+              <button class="btn btn--small btn--primary" type="button" data-post="/migrations/<%= migration.id %>/control" data-body='{"action":"resume"}'>
+                <%- include("../partials/icon", { name: "play", size: 14 }) %> Resume from where it stopped
+              </button>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="banner">
+          <%- include("../partials/icon", { name: "info" }) %>
+          <div class="banner__body">Cancelled. What was created in Shopify before cancelling stays there; a new migration skips it rather than duplicating it.</div>
+        </div>
+      <% } %>
+
+      <% if (demo && cleanup) { %>
+        <div class="banner<%= cleanupRunning ? "" : cleanup.status === "failed" ? " banner--critical" : " banner--success" %>" id="cleanup-banner">
+          <%- include("../partials/icon", { name: cleanupRunning ? "clock" : cleanup.status === "failed" ? "alert" : "check-circle" }) %>
+          <div class="banner__body">
+            <% if (cleanupRunning) { %>Deleting the demo data from Shopify…
+            <% } else if (cleanup.status === "failed") { %><%= cleanup.error %>
+            <% } else { %>Demo data deleted from Shopify (<%= cleanup.removed %> records)<%= cleanup.failed ? "; " + cleanup.failed + " could not be deleted" : "" %>. A full migration will create them again.<% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <section class="grid grid--4 grid--keep">
+        <div class="card stat"><span class="stat__label">Migrated</span><span class="stat__value stat__value--success"><%= h.number(progress.succeeded) %></span></div>
+        <div class="card stat"><span class="stat__label">Failed</span><span class="stat__value<%= progress.failed ? " stat__value--critical" : "" %>"><%= h.number(progress.failed) %></span></div>
+        <div class="card stat"><span class="stat__label">Skipped (already existed)</span><span class="stat__value"><%= h.number(progress.skipped) %></span></div>
+        <div class="card stat"><span class="stat__label">Duration</span><span class="stat__value"><%= durationSeconds ? h.duration(durationSeconds) : "—" %></span></div>
+      </section>
+
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">By data type</h2>
+        </div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table class="table">
+            <thead><tr><th>Data</th><th class="num">Migrated</th><th class="num">Failed</th><th class="num">Skipped</th><th class="num">Total</th><th></th></tr></thead>
+            <tbody>
+              <% progress.steps.forEach(function (row) { var s = h.stepStatus(row.status); %>
+                <tr>
+                  <td class="table__primary"><%= row.label %></td>
+                  <td class="num"><%= h.number(row.succeeded) %></td>
+                  <td class="num" style="<%= row.failed ? "color:var(--critical);font-weight:600" : "" %>"><%= h.number(row.failed) %></td>
+                  <td class="num"><%= h.number(row.skipped) %></td>
+                  <td class="num"><%= h.number(row.total) %></td>
+                  <td style="text-align:right"><span class="badge<%= s.tone ? " badge--" + s.tone : "" %>"><%= s.label %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">Needs attention</h2>
+            <p class="card__copy">
+              <% if (filesGone) { %>The error report was deleted with this migration's files.
+              <% } else if (errorTotal) { %><%= h.number(errorTotal) %> record<%= errorTotal === 1 ? "" : "s" %> failed or were skipped<%= errorTotal > errors.length ? " — showing the first " + errors.length + "; the CSV has all of them" : "" %>.
+              <% } else { %>Nothing failed. Every record made it across.<% } %>
+            </p>
+          </div>
+        </div>
+
+        <% if (errors.length) { %>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="table">
+              <thead><tr><th>Data</th><th>Old ID</th><th>Name</th><th>Reason</th></tr></thead>
+              <tbody>
+                <% errors.forEach(function (e) { %>
+                  <tr>
+                    <td><%= e.entityLabel.replace(/s$/, "") %><% if (e.kind === "skipped") { %> <span class="badge">Skipped</span><% } %></td>
+                    <td class="table__id"><%= e.sourceId %></td>
+                    <td class="table__primary"><%= e.name %></td>
+                    <td><%= e.reason %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <div class="card__section card__section--subdued row" style="margin-top:<%= errors.length ? 0 : 12 %>px">
+          <% if (errorTotal && !filesGone) { %>
+            <button class="btn" type="button" id="download-csv"><%- include("../partials/icon", { name: "download", size: 16 }) %> Download error CSV</button>
+          <% } %>
+          <% if (retryable && !filesGone) { %>
+            <button class="btn" type="button" data-post="/migrations/<%= migration.id %>/retry"
+              data-confirm="Retry the <%= retryable %> failed record<%= retryable === 1 ? "" : "s" %>?\n\nFix them in your old store first (the reasons are listed above). Only these records are migrated again."
+              data-confirm-label="Retry failed">
+              <%- include("../partials/icon", { name: "refresh", size: 16 }) %> Retry failed (<%= retryable %>)
+            </button>
+          <% } %>
+          <% if (canDelta) { %>
+            <button class="btn" type="button" data-post="/migrations/<%= migration.id %>/delta"
+              data-confirm="Migrate recent data?\n\nOnly orders, products and other records that are new or changed since this migration started are moved. Nothing already in Shopify is duplicated."
+              data-confirm-label="Migrate recent data">
+              <%- include("../partials/icon", { name: "migrate", size: 16 }) %> Migrate recent data
+            </button>
+          <% } else if (completed && !demo && !canDeltaPlan) { %>
+            <button class="btn" type="button" data-navigate="/plans" title="Available on Pro and Unlimited">
+              <%- include("../partials/icon", { name: "lock", size: 16 }) %> Migrate recent data
+            </button>
+          <% } %>
+          <% if (demo && !cleanupDone) { %>
+            <button class="btn btn--critical-plain" type="button" <%= cleanupRunning ? "disabled" : "" %>
+              data-post="/migrations/<%= migration.id %>/demo-cleanup"
+              data-confirm="Delete the demo data from Shopify?\n\nEverything this demo created — products, customers, orders and the rest — is deleted from <%= shop %>. Your old store is not touched."
+              data-confirm-label="Delete demo data" data-destructive data-toast="Deleting demo data…">
+              <%- include("../partials/icon", { name: "trash", size: 16 }) %> Delete demo data
+            </button>
+          <% } %>
+          <% if (demo && completed) { %>
+            <button class="btn btn--primary" type="button" data-post="/migrations/new" style="margin-left:auto">Start full migration</button>
+          <% } %>
+        </div>
+      </section>
+
+      <% if (log.length) { %>
+        <section class="card">
+          <div class="card__header"><h2 class="card__title">Timeline</h2></div>
+          <div class="card__section">
+            <pre style="margin:0;font:12px/1.6 var(--mono);white-space:pre-wrap;color:var(--muted)"><%= log.join("\n") %></pre>
+          </div>
+        </section>
+      <% } %>
+
+      <section class="card">
+        <div class="card__section row row--between">
+          <div class="row" style="flex-wrap:nowrap;align-items:flex-start">
+            <span style="color:var(--muted)"><%- include("../partials/icon", { name: "shield", size: 18 }) %></span>
+            <p class="muted" style="font-size:13px">
+              <% if (filesGone) { %>
+                This migration's files were deleted <%= h.shortDate(migration.files_deleted_at) %>. The record of what moved (old ID ↔ Shopify ID) stays, so later runs never duplicate anything.
+              <% } else { %>
+                Migration files are kept for <%= retention.personal %> days (customers and orders) and <%= retention.other %> days (everything else), then deleted automatically. They are encrypted and never public.
+              <% } %>
+            </p>
+          </div>
+          <div class="row">
+            <% if (!filesGone && !log.length) { %><button class="btn btn--plain" type="button" data-navigate="/migrations/<%= migration.id %>?log=1">Show timeline</button><% } %>
+            <% if (!filesGone) { %>
+              <button class="btn btn--small" type="button" data-post="/migrations/<%= migration.id %>/delete-files"
+                data-confirm="Delete this migration's files now?\n\nThe exported data, the error report and the timeline are deleted from our server immediately. Nothing in Shopify changes, and Retry failed will no longer be possible for this migration."
+                data-confirm-label="Delete files" data-destructive data-toast="Files deleted">
+                Delete migration data now
+              </button>
+            <% } %>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var id = <%- json(migration.id) %>;
+
+      var download = document.getElementById("download-csv");
+      if (download) {
+        download.addEventListener("click", async function () {
+          try {
+            var response = await window.appFetch("/migrations/" + id + "/errors.csv", { busy: download });
+            if (!response.ok) throw new Error("The error report could not be downloaded.");
+            var url = URL.createObjectURL(await response.blob());
+            var link = document.createElement("a");
+            link.href = url;
+            link.download = "migration-" + id + "-errors.csv";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+          } catch (error) {
+            window.appPageError(error.message);
+          }
+        });
+      }
+
+      <% if (cleanupRunning) { %>
+      // Demo clean-up runs in the background: check until it is done.
+      var timer = setInterval(async function () {
+        try {
+          var response = await window.appFetch("/migrations/" + id + "/status");
+          var data = await response.json();
+          if (data.cleanup && data.cleanup.status !== "running") {
+            clearInterval(timer);
+            window.appNavigate("/migrations/" + id);
+          }
+        } catch (e) { /* try again next tick */ }
+      }, 4000);
+      <% } %>
+    })();
+  </script>
+</body>
+</html>

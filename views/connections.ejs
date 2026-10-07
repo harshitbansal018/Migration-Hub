@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("partials/head") %>
+  <title>Connections</title>
+</head>
+<body>
+  <%- include("partials/nav") %>
+
+  <main class="page page--narrow">
+    <button class="back-link" type="button" data-navigate="/migrations"><%- include("partials/icon", { name: "arrow-left", size: 14 }) %> Migrations</button>
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">Old store connections</h1>
+        <p class="page-header__sub">The stores you migrate from. Keys are encrypted and never shown again.</p>
+      </div>
+    </header>
+
+    <div class="stack">
+      <%- include("partials/pageError") %>
+
+      <% if (!connections.length) { %>
+        <section class="card">
+          <div class="empty">
+            <div class="empty__art"><%- include("partials/icon", { name: "plug", size: 30 }) %></div>
+            <h2 class="empty__title">No old store connected</h2>
+            <p class="empty__copy">A new migration starts by connecting your old store with read-only API keys.</p>
+            <div class="row"><button class="btn btn--primary" type="button" data-post="/migrations/new">New migration</button></div>
+          </div>
+        </section>
+      <% } %>
+
+      <% connections.forEach(function (c) { %>
+        <section class="card">
+          <div class="card__section">
+            <div class="row row--between">
+              <div class="row">
+                <span class="tile__logo tile__logo--<%= c.platform %>" style="width:36px;height:36px;font-size:13px"><%= h.platformName(c.platform).slice(0, 2) %></span>
+                <div>
+                  <div class="table__primary"><%= h.platformName(c.platform) %> · <%= h.host(c.base_url) %></div>
+                  <div class="muted" style="font-size:12.5px"><%= c.source_version || "" %><%= c.source_version ? " · " : "" %>Tested <%= h.ago(c.last_tested_at) %></div>
+                </div>
+              </div>
+              <% if (c.status === "connected") { %>
+                <span class="badge badge--success">Connected</span>
+              <% } else { %>
+                <span class="badge badge--critical"><%= c.status === "failed" ? "Failed" : "Disconnected" %></span>
+              <% } %>
+            </div>
+          </div>
+          <div class="card__section">
+            <div class="grid grid--3">
+              <div><div class="kv__label">Keys</div><div class="kv__value" style="font-family:var(--mono);font-weight:500"><%= c.credentials_hint || "—" %></div></div>
+              <div><div class="kv__label">Found</div><div class="kv__value">
+                <% var found = Object.keys(c.scan_counts).filter(function (k) { return k.charAt(0) !== "_" && c.scan_counts[k]; }); %>
+                <%= found.length ? found.map(function (k) { return h.number(c.scan_counts[k]) + " " + h.entityLabel(k).toLowerCase(); }).join(" · ") : "—" %>
+              </div></div>
+              <div><div class="kv__label">Migrations</div><div class="kv__value"><%= c.migration_count %></div></div>
+            </div>
+            <% if (c.last_error) { %><p class="field__error" style="margin-top:10px"><%= c.last_error %></p><% } %>
+          </div>
+          <div class="card__section card__section--subdued row row--end">
+            <button class="btn btn--critical-plain btn" type="button"
+              data-post="/connections/<%= c.id %>/disconnect"
+              data-confirm="Disconnect <%= h.host(c.base_url) %>?\n\nIts API keys are deleted, together with its <%= c.migration_count %> migration<%= c.migration_count === 1 ? "" : "s" %>, their files and the record of what was migrated. Nothing in Shopify or your old store is changed.\n\nIf you connect it again later, a new migration cannot tell what was already moved."
+              data-confirm-label="Disconnect" data-destructive data-toast="Disconnected">
+              <%- include("partials/icon", { name: "trash", size: 16 }) %> Disconnect
+            </button>
+          </div>
+        </section>
+      <% }); %>
+    </div>
+  </main>
+</body>
+</html>

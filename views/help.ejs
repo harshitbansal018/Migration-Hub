@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("partials/head") %>
+  <title>Help &amp; support</title>
+</head>
+<body>
+  <%- include("partials/nav") %>
+
+  <main class="page page--narrow">
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">Help &amp; support</h1>
+        <p class="page-header__sub">How to set up, how to create API keys, and answers to common questions.</p>
+      </div>
+      <% if (supportEmail) { %>
+        <div class="page-header__actions">
+          <a class="btn" href="mailto:<%= supportEmail %>" target="_top"><%- include("partials/icon", { name: "help", size: 16 }) %> Contact support</a>
+        </div>
+      <% } %>
+    </header>
+
+    <%# A real navigation per tab: the server decides which is open, so reload and Back land where they should. %>
+    <nav class="tabs tabs--standalone" aria-label="Help sections">
+      <% [["install", "Installation steps"], ["keys", "API keys"], ["faq", "FAQ"]].forEach(function (t) { %>
+        <button class="tabs__tab<%= tab === t[0] ? " tabs__tab--on" : "" %>" type="button" data-navigate="/help?tab=<%= t[0] %>" <%= tab === t[0] ? "aria-current=page" : "" %>><%= t[1] %></button>
+      <% }); %>
+    </nav>
+
+    <% if (tab === "install") { %>
+
+      <section class="card">
+        <ol class="howto">
+          <% steps.forEach(function (step, index) { %>
+            <li class="howto__item">
+              <span class="howto__num"><%= index + 1 %></span>
+              <div>
+                <div class="howto__title"><%= step.title %></div>
+                <div class="howto__detail"><%= step.detail %></div>
+                <% if (step.path) { %>
+                  <div class="path">
+                    <% step.path.forEach(function (part, i) { %><% if (i) { %><%- include("partials/icon", { name: "chevron-right", size: 12 }) %><% } %><span><%= part %></span><% }); %>
+                  </div>
+                <% } %>
+              </div>
+            </li>
+          <% }); %>
+        </ol>
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <div class="card__header"><h2 class="card__title">How your data moves</h2></div>
+        <div class="card__section">
+          <div class="flow">
+            <span class="flow__node"><%- include("partials/icon", { name: "store", size: 16 }) %> Old store <span class="badge">read only</span></span>
+            <span class="flow__arrow"><%- include("partials/icon", { name: "arrow-right", size: 16 }) %></span>
+            <span class="flow__node"><%- include("partials/icon", { name: "lock", size: 16 }) %> Encrypted files <span class="badge">30 / 90 days</span></span>
+            <span class="flow__arrow"><%- include("partials/icon", { name: "arrow-right", size: 16 }) %></span>
+            <span class="flow__node"><%- include("partials/icon", { name: "check-circle", size: 16 }) %> Shopify <span class="badge badge--success">permanent</span></span>
+          </div>
+          <p class="muted" style="margin-top:12px">
+            Data moves in a fixed order — collections, products, customers, orders, coupons, pages &amp; posts, then redirects — so every order is linked to the right products and customer. Our database keeps only status, counters and old-ID ↔ Shopify-ID pairs; never names, emails or addresses.
+          </p>
+        </div>
+      </section>
+
+    <% } else if (tab === "keys") { %>
+
+      <div class="stack">
+        <% guides.forEach(function (guide) { %>
+          <section class="card">
+            <div class="card__header">
+              <div class="row">
+                <span class="tile__logo tile__logo--<%= guide.logo %>" style="width:32px;height:32px;font-size:12px;border-radius:9px"><%= guide.platform.slice(0, 2) %></span>
+                <h2 class="card__title"><%= guide.platform %></h2>
+              </div>
+            </div>
+            <ol class="howto">
+              <% guide.steps.forEach(function (text, index) { %>
+                <li class="howto__item"><span class="howto__num"><%= index + 1 %></span><div class="howto__detail" style="margin:3px 0 0;color:var(--text)"><%= text %></div></li>
+              <% }); %>
+            </ol>
+            <div class="card__section card__section--subdued">
+              <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="muted"><%- include("partials/icon", { name: "info", size: 16 }) %></span><span class="muted"><%= guide.note %></span></div>
+            </div>
+          </section>
+        <% }); %>
+      </div>
+
+    <% } else { %>
+
+      <section class="card">
+        <% if (!faq.length) { %>
+          <div class="card__section muted">No questions yet.</div>
+        <% } %>
+        <% faq.forEach(function (item) { %>
+          <details class="faq__item">
+            <summary class="faq__question"><span><%= item.question %></span><%- include("partials/icon", { name: "chevron-down", size: 16 }) %></summary>
+            <p class="faq__answer"><%= item.answer %></p>
+          </details>
+        <% }); %>
+      </section>
+
+    <% } %>
+  </main>
+</body>
+</html>

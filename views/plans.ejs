@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("partials/head") %>
+  <title>Plans</title>
+</head>
+<body>
+  <%- include("partials/nav") %>
+
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">Plans</h1>
+        <p class="page-header__sub">
+          <% if (current.plan && current.chosen) { %>
+            You are on the <strong><%= current.plan.name %></strong> plan.
+          <% } else { %>
+            You haven't chosen a plan yet<%= current.plan ? ", so the " + current.plan.name + " plan applies" : "" %>.
+          <% } %>
+          The free demo is always included and never counts against your plan.
+        </p>
+      </div>
+    </header>
+
+    <div class="stack">
+      <% if (billingResult === "success") { %>
+        <div class="banner banner--success"><%- include("partials/icon", { name: "check-circle" }) %><div class="banner__body">Your Shopify subscription is active.</div></div>
+      <% } else if (billingResult === "pending") { %>
+        <div class="banner banner--warning"><%- include("partials/icon", { name: "clock" }) %><div class="banner__body">Shopify is still confirming this subscription. Refresh this page shortly.</div></div>
+      <% } else if (billingResult === "failed") { %>
+        <div class="banner banner--critical"><%- include("partials/icon", { name: "alert" }) %><div class="banner__body">The Shopify subscription was not approved. Your current plan was not changed.</div></div>
+      <% } %>
+
+      <% if (billingTest) { %>
+        <div class="banner banner--warning"><%- include("partials/icon", { name: "info" }) %><div class="banner__body">Billing test mode is on. Shopify will show a test charge and will not collect money.</div></div>
+      <% } %>
+
+      <%- include("partials/pageError") %>
+
+      <section class="plans" aria-label="Plans">
+        <% plans.forEach(function (plan) { %>
+          <article class="plan<%= plan.current ? " plan--current" : "" %>">
+            <div class="plan__head">
+              <h2 class="plan__name"><%= plan.name %></h2>
+              <% if (plan.popular) { %><span class="badge badge--info">Popular</span><% } %>
+            </div>
+
+            <p class="plan__price">
+              <% if (plan.price) { %>$<%= plan.price.toFixed(0) %> <small>/mo</small><% } else { %>Free<% } %>
+            </p>
+
+            <ul class="plan__features">
+              <% plan.lines.forEach(function (line) { %>
+                <li><%- include("partials/icon", { name: "check", size: 16 }) %><span><%= line %></span></li>
+              <% }); %>
+            </ul>
+
+            <% if (plan.current) { %>
+              <span class="plan__current"><%- include("partials/icon", { name: "check-circle", size: 16 }) %> Current plan</span>
+            <% } else { %>
+              <button
+                class="btn btn--full<%= plan.direction === "upgrade" ? " btn--primary" : "" %> plan__select"
+                type="button"
+                data-plan="<%= plan.id %>"
+                data-name="<%= plan.name %>"
+                data-direction="<%= plan.direction %>">
+                <%= plan.direction === "upgrade" ? "Upgrade" : plan.direction === "downgrade" ? "Downgrade" : "Choose " + plan.name %>
+              </button>
+            <% } %>
+          </article>
+        <% }); %>
+      </section>
+
+      <p class="footnote"><%- include("partials/icon", { name: "wallet", size: 14 }) %> Billed through Shopify every 30 days. Records reset on the 1st of each month. Change or cancel any time.</p>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      Array.prototype.slice.call(document.querySelectorAll(".plan__select")).forEach(function (button) {
+        button.addEventListener("click", async function () {
+          window.appClearError();
+
+          if (button.dataset.direction === "downgrade" && !(await window.appConfirm(
+            "Downgrade to " + button.dataset.name + "?\n\nYour record limit changes straight away. Migrations already finished are not affected.",
+            { confirmLabel: "Downgrade" }
+          ))) return;
+
+          try {
+            var data = await window.appPostJson("/plans/select", { plan_id: Number(button.dataset.plan) }, button);
+            // A paid plan is approved in Shopify first, at the top level:
+            // the approval page refuses to be framed.
+            if (data.confirmation_url) {
+              window.top.location.href = data.confirmation_url;
+              return;
+            }
+            window.appToast("Plan updated");
+            window.appNavigate("/plans");
+          } catch (error) {
+            window.appPageError(error.message);
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

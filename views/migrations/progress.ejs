@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("../partials/head") %>
+  <title>Migration #<%= migration.id %></title>
+</head>
+<body>
+  <%- include("../partials/nav") %>
+
+  <main class="page">
+    <button class="back-link" type="button" data-navigate="/migrations"><%- include("../partials/icon", { name: "arrow-left", size: 14 }) %> Migrations</button>
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">
+          Migration #<%= migration.id %>
+          <span id="status-badge"><%- include("../partials/status", { value: migration.status }) %></span>
+          <% if (migration.type !== "full") { %><span class="badge badge--brand"><%= h.TYPE[migration.type] %></span><% } %>
+        </h1>
+        <p class="page-header__sub">
+          <%= h.platformName(migration.platform) %> · <%= h.host(migration.base_url) %>
+          <%- include("../partials/icon", { name: "arrow-right", size: 13 }) %> <%= shop %>
+          <% if (migration.started_at) { %>· started <%= h.shortDate(migration.started_at, { time: true }).replace("Today ", "") %><% } %>
+          · you can close this page
+        </p>
+      </div>
+      <div class="page-header__actions" id="controls">
+        <button class="btn" type="button" data-control="pause" <%= migration.status === "paused" ? "hidden" : "" %>
+          data-post="/migrations/<%= migration.id %>/control" data-body='{"action":"pause"}' data-toast="Pausing after the current page">
+          <%- include("../partials/icon", { name: "pause", size: 16 }) %> Pause
+        </button>
+        <button class="btn btn--primary" type="button" data-control="resume" <%= migration.status === "paused" ? "" : "hidden" %>
+          data-post="/migrations/<%= migration.id %>/control" data-body='{"action":"resume"}' data-toast="Resuming">
+          <%- include("../partials/icon", { name: "play", size: 16 }) %> Resume
+        </button>
+        <button class="btn btn--critical-plain" type="button"
+          data-post="/migrations/<%= migration.id %>/control" data-body='{"action":"cancel"}'
+          data-confirm="Cancel this migration?\n\nWhat has already been created in Shopify stays there. You can start a new migration later; anything already moved will be skipped, not duplicated."
+          data-confirm-label="Cancel migration" data-destructive>
+          Cancel
+        </button>
+      </div>
+    </header>
+
+    <div class="stack">
+      <%- include("../partials/pageError") %>
+
+      <div class="banner banner--warning" id="paused-banner" <%= migration.status === "paused" ? "" : "hidden" %>>
+        <%- include("../partials/icon", { name: "pause" }) %>
+        <div class="banner__body"><strong>Paused.</strong> Nothing is lost — Resume carries on from exactly where it stopped.</div>
+      </div>
+
+      <div class="banner" id="queued-banner" <%= migration.status === "queued" ? "" : "hidden" %>>
+        <%- include("../partials/icon", { name: "clock" }) %>
+        <div class="banner__body"><strong>Waiting for its turn.</strong> Migrations run one at a time per store; this one starts as soon as the worker is free.</div>
+      </div>
+
+      <section class="card">
+        <div class="card__section">
+          <span class="muted">Overall</span>
+          <div class="overall__numbers">
+            <span class="overall__count" id="overall-count"><%= h.number(progress.processed) %> / <%= h.number(progress.total) %></span>
+            <span class="overall__meta" id="overall-meta">
+              · <%= progress.percent %>%<% if (progress.remainingSeconds) { %> · about <%= h.duration(progress.remainingSeconds) %> left<% } %>
+            </span>
+          </div>
+          <div class="progress progress--thick<%= migration.status === "running" ? " progress--running" : "" %>" id="overall-bar" role="progressbar" aria-label="Overall progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= progress.percent %>">
+            <span class="progress__fill" style="width: <%= progress.percent %>%"></span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Data</th><th style="width:40%">Progress</th><th class="num">Done</th><th class="num">Failed</th><th class="num">Skipped</th><th>Status</th></tr>
+            </thead>
+            <tbody id="steps">
+              <% progress.steps.forEach(function (row) { var s = h.stepStatus(row.status); %>
+                <tr data-entity="<%= row.entity %>">
+                  <td class="table__primary"><%= row.label %></td>
+                  <td>
+                    <div class="cell-progress">
+                      <div class="progress progress--thin<%= row.status === "running" ? " progress--running" : "" %>">
+                        <span class="progress__fill<%= row.status === "done" ? " progress__fill--success" : "" %>" style="width: <%= row.percent %>%"></span>
+                      </div>
+                      <span class="phase-note" data-phase><%= row.phaseNote || "" %></span>
+                    </div>
+                  </td>
+                  <td class="num" data-done><%= h.number(row.succeeded) %></td>
+                  <td class="num" data-failed style="<%= row.failed ? "color:var(--critical);font-weight:600" : "" %>"><%= h.number(row.failed) %></td>
+                  <td class="num" data-skipped><%= h.number(row.skipped) %></td>
+                  <td data-status><span class="badge<%= s.tone ? " badge--" + s.tone : "" %><%= s.pulse ? " badge--pulse" : "" %>"><% if (s.pulse) { %><span class="badge__dot"></span><% } %><%= s.label %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="footnote"><%- include("../partials/icon", { name: "info", size: 14 }) %> Records already in Shopify are skipped, never duplicated. One failed record never stops the migration.</p>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var id = <%- json(migration.id) %>;
+      var STEP = { pending: ["Waiting", ""], running: ["Running", "info"], done: ["Done", "success"], failed: ["Failed", "critical"], skipped: ["Skipped", ""] };
+      var STATUS = { queued: ["Queued", "info"], running: ["Running", "info"], paused: ["Paused", "warning"] };
+      var fmt = function (n) { return (Number(n) || 0).toLocaleString("en-US"); };
+      var dur = function (s) {
+        var m = Math.round(s / 60);
+        if (s < 60) return "less than a minute";
+        if (m < 60) return m + " min";
+        var hh = Math.floor(m / 60), rest = m % 60;
+        return hh + " h" + (rest ? " " + rest + " min" : "");
+      };
+      var badge = function (pair, pulse) {
+        return '<span class="badge' + (pair[1] ? " badge--" + pair[1] : "") + (pulse ? " badge--pulse" : "") + '">' + (pulse ? '<span class="badge__dot"></span>' : "") + pair[0] + "</span>";
+      };
+      var failures = 0;
+
+      async function poll() {
+        try {
+          var response = await window.appFetch("/migrations/" + id + "/status");
+          if (!response.ok) throw new Error(String(response.status));
+          var data = await response.json();
+          failures = 0;
+
+          if (["completed", "failed", "cancelled"].indexOf(data.status) !== -1) {
+            window.appNavigate("/migrations/" + id); // the results screen
+            return;
+          }
+
+          document.getElementById("overall-count").textContent = fmt(data.processed) + " / " + fmt(data.total);
+          document.getElementById("overall-meta").textContent = "· " + data.percent + "%" + (data.remainingSeconds ? " · about " + dur(data.remainingSeconds) + " left" : "");
+          var bar = document.getElementById("overall-bar");
+          bar.querySelector(".progress__fill").style.width = data.percent + "%";
+          bar.setAttribute("aria-valuenow", data.percent);
+          bar.classList.toggle("progress--running", data.status === "running");
+
+          var pair = STATUS[data.status];
+          if (pair) document.getElementById("status-badge").innerHTML = badge(pair, data.status === "running");
+          document.getElementById("paused-banner").hidden = data.status !== "paused";
+          document.getElementById("queued-banner").hidden = data.status !== "queued";
+          document.querySelector("[data-control=pause]").hidden = data.status === "paused";
+          document.querySelector("[data-control=resume]").hidden = data.status !== "paused";
+
+          data.steps.forEach(function (step) {
+            var row = document.querySelector('tr[data-entity="' + step.entity + '"]');
+            if (!row) return;
+            var track = row.querySelector(".progress");
+            var fill = row.querySelector(".progress__fill");
+            fill.style.width = step.percent + "%";
+            fill.classList.toggle("progress__fill--success", step.status === "done");
+            track.classList.toggle("progress--running", step.status === "running");
+            row.querySelector("[data-phase]").textContent = step.phaseNote || "";
+            row.querySelector("[data-done]").textContent = fmt(step.succeeded);
+            var failed = row.querySelector("[data-failed]");
+            failed.textContent = fmt(step.failed);
+            failed.style.cssText = step.failed ? "color:var(--critical);font-weight:600" : "";
+            row.querySelector("[data-skipped]").textContent = fmt(step.skipped);
+            row.querySelector("[data-status]").innerHTML = badge(STEP[step.status] || [step.status, ""], step.status === "running");
+          });
+        } catch (error) {
+          failures += 1;
+        }
+        // Back off gently if the app is unreachable; normal pace is 3 s.
+        setTimeout(poll, Math.min(3000 * Math.pow(2, failures), 30000));
+      }
+
+      setTimeout(poll, 3000);
+    })();
+  </script>
+</body>
+</html>

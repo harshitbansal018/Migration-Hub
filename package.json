@@ -1,0 +1,31 @@
+{
+  "name": "shopify-store-migration",
+  "version": "1.0.0",
+  "description": "Shopify embedded app: migrate WooCommerce / WordPress stores to Shopify",
+  "main": "server.js",
+  "scripts": {
+    "test": "node tests/security.test.js && node tests/tokens.test.js && node tests/migration.test.js",
+    "start": "node server.js",
+    "worker": "node worker.js",
+    "dev": "nodemon --ignore storage/ server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.14.0",
+    "dotenv": "^17.4.1",
+    "ejs": "^5.0.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.20.0",
+    "nodemailer": "^10.0.3"
+  },
+  "devDependencies": {
+    "cloudflared": "^0.7.3",
+    "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

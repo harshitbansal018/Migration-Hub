@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("partials/head") %>
+  <title>Set up your store</title>
+</head>
+<body>
+  <%- include("partials/nav") %>
+
+  <main class="page page--narrow">
+
+    <% if (complete) { %>
+
+      <%# The last time this screen is seen: onboarded_at is already set. %>
+      <section class="card">
+        <div class="empty">
+          <div class="empty__art"><%- include("partials/icon", { name: "check-circle", size: 30 }) %></div>
+          <h1 class="empty__title">You are ready to migrate</h1>
+          <p class="empty__copy">Your old store is connected, the demo looked right, and your plan is set. Start the full migration whenever you are ready.</p>
+          <div class="row">
+            <button class="btn" type="button" data-navigate="/dashboard">Go to Dashboard</button>
+            <button class="btn btn--primary" type="button" data-post="/migrations/new">
+              <%- include("partials/icon", { name: "plus", size: 16 }) %> New migration
+            </button>
+          </div>
+        </div>
+      </section>
+
+    <% } else { %>
+
+      <header class="page-header">
+        <div>
+          <h1 class="page-header__title">Set up your store</h1>
+          <p class="page-header__sub"><%= total %> steps and you are ready to migrate.</p>
+        </div>
+      </header>
+
+      <%- include("partials/pageError") %>
+
+      <section class="card">
+        <div class="card__section">
+          <div class="row row--between" style="margin-bottom:8px">
+            <span class="muted"><%= done %> of <%= total %> done</span>
+          </div>
+          <div class="progress" role="progressbar" aria-valuenow="<%= done %>" aria-valuemin="0" aria-valuemax="<%= total %>" aria-label="Setup progress">
+            <span class="progress__fill progress__fill--success" style="width: <%= Math.round((done / total) * 100) %>%"></span>
+          </div>
+        </div>
+
+        <ol style="list-style:none;margin:0;padding:0">
+          <% var firstOpen = steps.findIndex(function (s) { return s.state !== "done"; }); %>
+          <% steps.forEach(function (step, index) { %>
+            <li class="setup-step setup-step--<%= step.state %><%= index === firstOpen ? " setup-step--current" : "" %>">
+              <span class="setup-step__mark" aria-hidden="true">
+                <% if (step.state === "done") { %><%- include("partials/icon", { name: "check", size: 16 }) %><% } else { %><%= index + 1 %><% } %>
+              </span>
+
+              <div class="setup-step__body">
+                <h2 class="setup-step__title">
+                  <%= index + 1 %>. <%= step.title %>
+                  <% if (step.state === "done") { %><span class="badge badge--success">Done</span><% } %>
+                  <% if (step.state === "waiting") { %><span class="badge badge--info badge--pulse"><span class="badge__dot"></span>In progress</span><% } %>
+                </h2>
+
+                <p class="muted">
+                  <% if (step.state === "done" && step.detail) { %><%= step.detail %>
+                  <% } else if (step.state === "locked" || step.state === "waiting") { %><%= step.note %>
+                  <% } else { %><%= step.body %><% } %>
+                </p>
+
+                <% if (step.state === "ready") { %>
+                  <div class="setup-step__actions">
+                    <% if (step.action.kind === "new-migration") { %>
+                      <button class="btn<%= index === firstOpen ? " btn--primary" : "" %>" type="button" data-post="/migrations/new">
+                        <%- include("partials/icon", { name: "plug", size: 16 }) %> <%= step.action.label %>
+                      </button>
+                    <% } else if (step.action.kind === "demo") { %>
+                      <button class="btn<%= index === firstOpen ? " btn--primary" : "" %>" type="button" data-post="/migrations/demo">
+                        <%- include("partials/icon", { name: "sparkle", size: 16 }) %> <%= step.action.label %>
+                      </button>
+                    <% } else { %>
+                      <button class="btn<%= index === firstOpen ? " btn--primary" : "" %>" type="button" data-navigate="<%= step.action.href %>">
+                        <%= step.action.label %>
+                      </button>
+                    <% } %>
+                  </div>
+                <% } else if (step.state === "waiting" && step.waitingId) { %>
+                  <div class="setup-step__actions">
+                    <button class="btn" type="button" data-navigate="/migrations/<%= step.waitingId %>">View progress</button>
+                  </div>
+                <% } %>
+              </div>
+            </li>
+          <% }); %>
+        </ol>
+      </section>
+
+      <p style="text-align:center;margin-top:16px">
+        <button class="btn btn--plain" type="button"
+          data-post="/setup/skip" data-then="/dashboard"
+          data-confirm="Skip setup for now?\n\nNothing you have done is lost, and the dashboard keeps showing what is left."
+          data-confirm-label="Skip setup">
+          Skip setup for now
+        </button>
+      </p>
+
+      <p class="footnote"><%- include("partials/icon", { name: "shield", size: 14 }) %> We only ever <strong>read</strong> from your old store. Nothing there is changed or deleted.</p>
+
+    <% } %>
+
+  </main>
+</body>
+</html>

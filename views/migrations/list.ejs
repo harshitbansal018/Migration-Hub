@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("../partials/head") %>
+  <title>Migrations</title>
+</head>
+<body>
+  <%- include("../partials/nav") %>
+
+  <%
+    var tabs = [
+      { key: "all", label: "All", count: counts.all + counts.drafts },
+      { key: "running", label: "Running", count: counts.running },
+      { key: "completed", label: "Completed", count: counts.completed },
+      { key: "failed", label: "Failed", count: counts.failed },
+      { key: "drafts", label: "Drafts", count: counts.drafts },
+    ];
+  %>
+
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">Migrations</h1>
+        <p class="page-header__sub">
+          <% if (connection) { %>
+            Connected: <strong><%= h.platformName(connection.platform) %> · <%= h.host(connection.base_url) %></strong>
+            <span style="color:var(--success)"><%- include("../partials/icon", { name: "check", size: 14 }) %></span>
+            &nbsp;<button class="link" type="button" data-navigate="/connections">Manage connection</button>
+          <% } else { %>
+            No old store connected yet.
+          <% } %>
+        </p>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn--primary" type="button" data-post="/migrations/new">
+          <%- include("../partials/icon", { name: "plus", size: 16 }) %> New migration
+        </button>
+      </div>
+    </header>
+
+    <div class="stack">
+      <%- include("../partials/pageError") %>
+
+      <section class="card">
+        <nav class="tabs" aria-label="Filter migrations">
+          <% tabs.forEach(function (tab) { %>
+            <button class="tabs__tab<%= filter === tab.key ? " tabs__tab--on" : "" %>" type="button"
+              data-navigate="/migrations<%= tab.key === "all" ? "" : "?filter=" + tab.key %>"
+              <%= filter === tab.key ? 'aria-current=page' : "" %>>
+              <%= tab.label %> <span class="tabs__count">(<%= tab.count %>)</span>
+            </button>
+          <% }); %>
+        </nav>
+
+        <% if (migrations.length) { %>
+          <div class="table-wrap">
+            <table class="table table--stack">
+              <thead>
+                <tr>
+                  <th>#</th><th>Source</th><th class="hide-sm">Type</th><th class="hide-sm">Data</th>
+                  <th>Status</th><th class="num">Migrated</th><th class="num">Failed</th><th>Started</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% migrations.forEach(function (m) { %>
+                  <tr data-navigate="/migrations/<%= m.id %>" tabindex="0">
+                    <td class="table__id"><%= m.id %></td>
+                    <td>
+                      <% if (m.platform) { %>
+                        <span class="table__primary"><%= h.platformName(m.platform) %></span>
+                        <span class="table__secondary"><%= h.host(m.base_url) %></span>
+                      <% } else { %>
+                        <span class="muted">Not connected yet</span>
+                      <% } %>
+                    </td>
+                    <td class="hide-sm"><%= m.status === "draft" ? "—" : h.TYPE[m.type] %></td>
+                    <td class="hide-sm"><%= h.entityList(m.entities, { all: 7 }) %></td>
+                    <td>
+                      <%- include("../partials/status", { value: m.status, percent: m.percent }) %>
+                      <% if (m.status === "draft") { %><span class="table__secondary">Step <%= m.wizard_step %> of 5</span><% } %>
+                    </td>
+                    <td class="num" data-label="Migrated"><%= m.status === "draft" ? "—" : h.number(m.succeeded) %></td>
+                    <td class="num" data-label="Failed"><span style="<%= m.failed ? "color:var(--critical);font-weight:600" : "" %>"><%= m.status === "draft" ? "—" : h.number(m.failed) %></span></td>
+                    <td class="nowrap"><%= h.shortDate(m.started_at || m.created_at, { time: true }) %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="empty">
+            <div class="empty__art"><%- include("../partials/icon", { name: "migrate", size: 30 }) %></div>
+            <h2 class="empty__title"><%= filter === "all" ? "No migrations yet" : "Nothing here" %></h2>
+            <p class="empty__copy">
+              <%= filter === "all"
+                ? "Start with a free demo: it moves 20 of each so you can check them in Shopify before the full migration."
+                : "No migrations match this filter." %>
+            </p>
+            <% if (filter === "all") { %>
+              <div class="row"><button class="btn btn--primary" type="button" data-post="/migrations/new">New migration</button></div>
+            <% } %>
+          </div>
+        <% } %>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

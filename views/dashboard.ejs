@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("partials/head") %>
+  <title>Dashboard</title>
+</head>
+<body>
+  <%- include("partials/nav") %>
+
+  <%
+    var cardIcons = { products: "box", customers: "users", orders: "receipt", collections: "folder", redirects: "link" };
+    var usedPct = limits.unlimited ? 0 : (limits.maxRecords ? Math.min(100, Math.round((limits.used / limits.maxRecords) * 100)) : 100);
+  %>
+
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">Dashboard</h1>
+        <p class="page-header__sub"><%= shop %> · <%= limits.name %> plan</p>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn--primary" type="button" data-post="/migrations/new">
+          <%- include("partials/icon", { name: "plus", size: 16 }) %> New migration
+        </button>
+      </div>
+    </header>
+
+    <div class="stack">
+      <%- include("partials/pageError") %>
+
+      <% if (setup) { %>
+        <div class="banner banner--warning banner--inline">
+          <%- include("partials/icon", { name: "info" }) %>
+          <div class="banner__body"><strong>Setup is not finished</strong> — <%= setup.done %> of <%= setup.total %> steps done.<% if (setup.next) { %> Next: <%= setup.next.title %>.<% } %></div>
+          <div class="banner__actions"><button class="btn btn--small" type="button" data-navigate="/setup">Finish setup</button></div>
+        </div>
+      <% } %>
+
+      <% if (live) { %>
+        <div class="live" data-live="<%= live.migration.id %>">
+          <span class="badge badge--info badge--pulse"><span class="badge__dot"></span><%= h.status(live.migration.status).label %></span>
+          <div class="live__text">
+            Migration #<%= live.migration.id %> is <%= live.migration.status %>
+            <% if (live.current) { %>— <%= live.current.label %> <span class="num"><%= h.number(live.current.processed) %> / <%= h.number(live.current.total) %></span><% } %>
+            (<%= live.progress.percent %>%)
+          </div>
+          <div class="progress progress--thin"><span class="progress__fill" style="width: <%= live.progress.percent %>%"></span></div>
+          <button class="btn btn--small" type="button" data-navigate="/migrations/<%= live.migration.id %>">View progress</button>
+        </div>
+      <% } %>
+
+      <% if (!counts.all && !live) { %>
+        <section class="card">
+          <div class="empty">
+            <div class="empty__art"><%- include("partials/icon", { name: "migrate", size: 30 }) %></div>
+            <h2 class="empty__title">Move your store to Shopify</h2>
+            <p class="empty__copy">Connect your WooCommerce or WordPress store, try a free demo of 20 of each, then move everything — products, customers, orders and your Google rankings.</p>
+            <div class="row">
+              <button class="btn" type="button" data-navigate="/help">How it works</button>
+              <button class="btn btn--primary" type="button" data-post="/migrations/new">Start your first migration</button>
+            </div>
+          </div>
+        </section>
+      <% } %>
+
+      <section class="grid grid--4 grid--keep" aria-label="Migrations">
+        <div class="card stat">
+          <span class="stat__label">Total migrations</span>
+          <span class="stat__value"><%= h.number(counts.all) %></span>
+          <span class="stat__note"><%= counts.demo %> demo · <%= counts.full %> full</span>
+        </div>
+        <div class="card stat">
+          <span class="stat__label">Completed</span>
+          <span class="stat__value stat__value--success"><%= h.number(counts.completed) %></span>
+          <span class="stat__note"><%= counts.lastCompleted ? "Last: " + h.ago(counts.lastCompleted) : "None yet" %></span>
+        </div>
+        <div class="card stat">
+          <span class="stat__label">In progress</span>
+          <span class="stat__value"><%= h.number(counts.running) %></span>
+          <span class="stat__note"><%= counts.runningSince ? "Started " + h.ago(counts.runningSince) : "Nothing running" %></span>
+        </div>
+        <div class="card stat">
+          <span class="stat__label">Failed / cancelled</span>
+          <span class="stat__value<%= counts.failed ? " stat__value--critical" : "" %>"><%= h.number(counts.failed) %></span>
+          <span class="stat__note<%= counts.failed ? " stat__note--critical" : "" %>"><%= counts.failed ? "Needs attention" : "All good" %></span>
+        </div>
+      </section>
+
+      <section class="grid grid--5 grid--keep" aria-label="Records migrated by type">
+        <% cards.forEach(function (card) { %>
+          <div class="card stat">
+            <span class="stat__icon"><%- include("partials/icon", { name: cardIcons[card.entity], size: 16 }) %></span>
+            <span class="stat__label"><%= h.entityLabel(card.entity) %></span>
+            <span class="stat__value stat__value--sm"><%= h.number(card.succeeded) %></span>
+            <span class="stat__note<%= card.failed ? " stat__note--critical" : "" %>">
+              <%= card.entity === "redirects" ? "SEO kept" : h.number(card.failed) + " failed" %>
+            </span>
+          </div>
+        <% }); %>
+      </section>
+
+      <section class="grid grid--2">
+        <div class="card stat">
+          <span class="stat__label">Total records migrated</span>
+          <span class="stat__value"><%= h.number(succeeded) %></span>
+          <div class="progress progress--thin" style="margin:8px 0 6px">
+            <span class="progress__fill progress__fill--success" style="width: <%= successRate === null ? 0 : successRate.toFixed(1) %>%"></span>
+          </div>
+          <span class="stat__note">
+            <% if (successRate === null) { %>Demos are not counted here.<% } else { %><%= successRate >= 99.95 ? "100" : successRate.toFixed(1) %>% success · <%= h.number(failed) %> failed record<%= failed === 1 ? "" : "s" %><% } %>
+          </span>
+        </div>
+        <div class="card stat">
+          <span class="stat__label">Plan usage this month</span>
+          <span class="stat__value"><%= h.number(limits.used) %> <small>/ <%= limits.unlimited ? "Unlimited" : h.number(limits.maxRecords) %></small></span>
+          <div class="progress progress--thin" style="margin:8px 0 6px">
+            <span class="progress__fill<%= usedPct >= 90 ? " progress__fill--critical" : usedPct >= 75 ? " progress__fill--warning" : "" %>" style="width: <%= limits.unlimited ? 0 : usedPct %>%"></span>
+          </div>
+          <span class="stat__note">
+            <%= limits.name %> plan · resets <%= limits.resetsOn.getUTCDate() %> <%= ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][limits.resetsOn.getUTCMonth()] %>
+            <% if (limits.demoOnly) { %> · <button class="link" type="button" data-navigate="/plans">Choose a plan</button> for full migrations<% } %>
+          </span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__header">
+          <h2 class="card__title">Recent migrations</h2>
+          <% if (recent.length) { %><button class="btn btn--plain" type="button" data-navigate="/migrations">View all</button><% } %>
+        </div>
+        <% if (recent.length) { %>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="table table--stack">
+              <thead>
+                <tr><th>#</th><th>Source</th><th class="hide-sm">Type</th><th class="hide-sm">Data</th><th>Status</th><th class="num">Records</th><th>Date</th></tr>
+              </thead>
+              <tbody>
+                <% recent.forEach(function (m) { %>
+                  <tr data-navigate="/migrations/<%= m.id %>" tabindex="0">
+                    <td class="table__id"><%= m.id %></td>
+                    <td><span class="table__primary"><%= h.platformName(m.platform) %></span><span class="table__secondary"><%= h.host(m.base_url) %></span></td>
+                    <td class="hide-sm"><%= h.TYPE[m.type] %></td>
+                    <td class="hide-sm"><%= h.entityList(m.entities, { all: 7 }) %></td>
+                    <td><%- include("partials/status", { value: m.status, percent: m.percent }) %></td>
+                    <td class="num"><%= h.number(m.succeeded) %></td>
+                    <td class="nowrap"><%= h.shortDate(m.started_at || m.created_at) %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="card__section"><p class="muted">Your migrations will appear here.</p></div>
+        <% } %>
+      </section>
+    </div>
+  </main>
+
+  <% if (live) { %>
+  <script>
+    // Refresh the running banner while it is on screen.
+    (function () {
+      var id = <%- json(live.migration.id) %>;
+      var timer = setInterval(async function () {
+        try {
+          var response = await window.appFetch("/migrations/" + id + "/status");
+          if (!response.ok) return;
+          var data = await response.json();
+          if (["completed", "failed", "cancelled"].indexOf(data.status) !== -1) {
+            clearInterval(timer);
+            window.appNavigate("/dashboard");
+            return;
+          }
+          var fill = document.querySelector("[data-live] .progress__fill");
+          if (fill) fill.style.width = data.percent + "%";
+        } catch (e) { /* the next tick tries again */ }
+      }, 5000);
+    })();
+  </script>
+  <% } %>
+</body>
+</html>

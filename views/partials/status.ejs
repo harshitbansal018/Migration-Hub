@@ -1,0 +1,6 @@
+<%# A migration's status as a badge. Pass `value` (the status) and optionally `percent` for a running one. %>
+<% var s = h.status(value); %>
+<span class="badge<%= s.tone ? " badge--" + s.tone : "" %><%= s.pulse ? " badge--pulse" : "" %>" data-status-badge>
+  <% if (s.pulse) { %><span class="badge__dot"></span><% } %>
+  <%= s.label %><% if (typeof percent !== "undefined" && percent !== null && (value === "running" || value === "paused")) { %> · <%= percent %>%<% } %>
+</span>

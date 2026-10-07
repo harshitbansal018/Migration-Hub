@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b5368">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+  <title>Install Store Migration</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+
+<%#
+  The landing page for someone who reached the app with no shop context (a
+  direct link, a bookmark). Shopify appends ?shop= on every App Store install
+  and embedded load, so merchants coming through Shopify never see this.
+  Not embedded: no App Bridge, because there is no shop to have a session with.
+%>
+
+<body>
+  <main class="install">
+    <div class="install__card">
+      <div class="brand">
+        <span class="brand__mark"><%- include("partials/icon", { name: "migrate", size: 20 }) %></span>
+        Store Migration
+      </div>
+
+      <section class="card">
+        <div class="card__section">
+          <h1 class="wizard-title">Install on your Shopify store</h1>
+          <p class="wizard-sub">Move products, customers, orders and your SEO from WooCommerce or WordPress to Shopify.</p>
+        </div>
+
+        <form class="card__section" method="get" action="/api/auth/install">
+          <% if (error) { %>
+            <div class="banner banner--critical" style="margin-bottom:14px"><%- include("partials/icon", { name: "alert" }) %><div class="banner__body"><%= error %></div></div>
+          <% } %>
+
+          <div class="field">
+            <label class="field__label" for="shop">Store address</label>
+            <input class="input" id="shop" name="shop" type="text" value="<%= value %>"
+              placeholder="mystore.myshopify.com" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus required>
+            <p class="field__help">Your <code>.myshopify.com</code> address. Pasting the admin URL works too.</p>
+          </div>
+
+          <button class="btn btn--primary btn--large btn--full" type="submit" style="margin-top:16px">Install</button>
+        </form>
+      </section>
+
+      <p class="footnote">You will be sent to Shopify to approve the app. Already installed? Open it from Apps in your Shopify admin.</p>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include("../partials/head") %>
+  <title>New migration</title>
+</head>
+<body>
+  <%- include("../partials/nav") %>
+
+  <%
+    var STEPS = ["Platform", "Connect", "Select data", "Options", "Review"];
+    var chosen = migration.entities || [];
+    var has = function (key) { return chosen.indexOf(key) !== -1; };
+    var connected = connection && connection.status === "connected" && platform && connection.platform === platform.key;
+    var shown = connection || saved;
+    var radio = function (name, value, current) { return 'name="' + name + '" value="' + value + '"' + (current === value ? " checked" : ""); };
+  %>
+
+  <main class="page page--narrow">
+    <button class="back-link" type="button" data-navigate="/migrations"><%- include("../partials/icon", { name: "arrow-left", size: 14 }) %> Migrations</button>
+    <header class="page-header">
+      <div>
+        <h1 class="page-header__title">New migration <span class="badge">Draft #<%= migration.id %></span></h1>
+        <p class="page-header__sub">Your choices are saved as you go — leave any time and continue later.</p>
+      </div>
+    </header>
+
+    <ol class="stepper" aria-label="Steps">
+      <% STEPS.forEach(function (label, index) { var n = index + 1; var state = n === step ? "current" : n <= migration.wizard_step ? "done" : ""; %>
+        <li class="stepper__item<%= state ? " stepper__item--" + state : "" %>"
+          <% if (state === "done") { %>data-navigate="/migrations/<%= migration.id %>?step=<%= n %>" role="link" tabindex="0"<% } %>
+          <%= n === step ? 'aria-current=step' : "" %>>
+          <span class="stepper__num"><% if (state === "done") { %><%- include("../partials/icon", { name: "check", size: 13 }) %><% } else { %><%= n %><% } %></span>
+          <span><%= label %></span>
+        </li>
+      <% }); %>
+    </ol>
+
+    <%- include("../partials/pageError") %>
+
+    <form class="card" id="wizard" data-step="<%= step %>" data-id="<%= migration.id %>" novalidate style="margin-top:12px">
+
+      <% if (step === 1) { %>
+        <%# ------------------------------------------------ 1 Platform %>
+        <div class="card__section">
+          <h2 class="wizard-title">Where are you migrating from?</h2>
+          <p class="wizard-sub">Pick the platform your current store runs on.</p>
+        </div>
+        <div class="card__section">
+          <div class="tiles" role="radiogroup" aria-label="Platform">
+            <% platforms.forEach(function (p) { %>
+              <label class="tile<%= p.available ? "" : " tile--disabled" %>">
+                <input type="radio" name="platform" value="<%= p.key %>" <%= p.available ? "" : "disabled" %> <%= platform && platform.key === p.key ? "checked" : "" %>>
+                <span class="tile__check"><%- include("../partials/icon", { name: "check-circle", size: 18 }) %></span>
+                <span class="tile__logo tile__logo--<%= p.key %>"><%= p.name.slice(0, 2) %></span>
+                <span class="tile__name"><%= p.name %></span>
+                <span class="tile__blurb"><%= p.available ? p.blurb : "Coming soon" %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+
+      <% } else if (step === 2) { %>
+        <%# ------------------------------------------------ 2 Connect %>
+        <div class="card__section">
+          <h2 class="wizard-title">Connect your <%= platform.name %> <%= platform.key === "wordpress" ? "site" : "store" %></h2>
+          <p class="wizard-sub">
+            <% if (platform.key === "woocommerce") { %>
+              We only need <strong>Read</strong> access. Your keys are encrypted and never shown again.
+            <% } else { %>
+              Published pages and posts need no keys. Add an application password only to include drafts.
+            <% } %>
+            <button class="link" type="button" data-navigate="/help?tab=keys">How do I create API keys?</button>
+          </p>
+        </div>
+        <div class="card__section">
+          <div class="grid grid--2" style="align-items:stretch;gap:16px">
+            <div>
+              <div class="field">
+                <label class="field__label" for="base_url"><%= platform.key === "woocommerce" ? "Store URL" : "Site URL" %></label>
+                <input class="input" id="base_url" name="base_url" type="url" inputmode="url" autocomplete="url"
+                  placeholder="https://myshop.com" value="<%= shown ? shown.base_url : "" %>" required>
+              </div>
+
+              <% if (platform.key === "woocommerce") { %>
+                <div class="field">
+                  <label class="field__label" for="consumer_key">Consumer key</label>
+                  <div class="input-group">
+                    <input class="input input--mono" id="consumer_key" name="consumer_key" type="password" autocomplete="off" spellcheck="false"
+                      placeholder="<%= shown ? shown.credentials_hint + "  (saved)" : "ck_…" %>">
+                    <button class="input-group__toggle" type="button" data-reveal="consumer_key">Show</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field__label" for="consumer_secret">Consumer secret</label>
+                  <div class="input-group">
+                    <input class="input input--mono" id="consumer_secret" name="consumer_secret" type="password" autocomplete="off" spellcheck="false"
+                      placeholder="<%= shown ? "cs_…  (saved)" : "cs_…" %>">
+                    <button class="input-group__toggle" type="button" data-reveal="consumer_secret">Show</button>
+                  </div>
+                  <% if (shown) { %><p class="field__help">Leave both empty to use the saved keys.</p><% } %>
+                </div>
+              <% } else { %>
+                <div class="field">
+                  <label class="field__label" for="username">Username <span class="muted">(optional)</span></label>
+                  <input class="input" id="username" name="username" type="text" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="field">
+                  <label class="field__label" for="app_password">Application password <span class="muted">(optional)</span></label>
+                  <div class="input-group">
+                    <input class="input input--mono" id="app_password" name="app_password" type="password" autocomplete="off" spellcheck="false" placeholder="xxxx xxxx xxxx xxxx">
+                    <button class="input-group__toggle" type="button" data-reveal="app_password">Show</button>
+                  </div>
+                </div>
+              <% } %>
+
+              <div class="row" style="margin-top:16px">
+                <button class="btn btn--primary" type="button" id="test-connection">
+                  <%- include("../partials/icon", { name: "plug", size: 16 }) %> Test connection
+                </button>
+              </div>
+            </div>
+
+            <div class="scan" id="scan" aria-live="polite">
+              <% if (connected) { %>
+                <div class="muted" style="font-size:12.5px">Connection result</div>
+                <div class="scan__status scan__status--ok"><%- include("../partials/icon", { name: "check-circle", size: 16 }) %> Connected — <%= connection.source_version || platform.name %></div>
+                <div class="muted" style="margin-top:6px;font-size:12.5px">We found in your <%= platform.key === "wordpress" ? "site" : "store" %>:</div>
+                <ul class="scan__list">
+                  <% entities.filter(function (e) { return e.key !== "redirects"; }).forEach(function (e) { %>
+                    <li><span><%= e.source %></span><strong><%= h.number(counts[e.key]) %></strong></li>
+                  <% }); %>
+                </ul>
+              <% } else { %>
+                <div class="scan__placeholder">
+                  <div>
+                    <%- include("../partials/icon", { name: "store", size: 28 }) %>
+                    <p style="margin-top:6px">Test the connection to see<br>what we find in your store.</p>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+      <% } else if (step === 3) { %>
+        <%# ------------------------------------------------ 3 Select data %>
+        <div class="card__section">
+          <h2 class="wizard-title">What do you want to migrate?</h2>
+          <p class="wizard-sub">From <strong><%= h.host(connection.base_url) %></strong>. Data moves in this order, so everything links up.</p>
+        </div>
+        <div class="card__section">
+          <div class="pick">
+            <% entities.forEach(function (e) {
+                 var count = e.key === "redirects" ? null : Number(counts[e.key]) || 0;
+                 var empty = count === 0;
+                 var detail = e.key === "orders" ? "needs Products + Customers" : e.detail || (e.source !== e.shopify ? "→ " + e.shopify : "");
+            %>
+              <label class="pick__item">
+                <input type="checkbox" name="entities" value="<%= e.key %>" <%= has(e.key) ? "checked" : "" %> <%= empty ? "disabled" : "" %>>
+                <span class="pick__text">
+                  <span class="pick__name"><%= e.key === "collections" ? "Categories" : e.key === "redirects" ? "301 Redirects" : e.label %></span>
+                  <span class="pick__detail"><%= e.key === "collections" ? "→ Collections" : e.key === "coupons" ? "→ Discount codes" : detail %></span>
+                  <% if (!allows(e.key)) { %><span class="badge badge--attention" style="margin-left:4px">Not in <%= limits.name %></span><% } %>
+                </span>
+                <span class="pick__count"><%= e.key === "redirects" ? "auto" : h.number(count) %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+        <% if (platform.entities.indexOf("orders") !== -1) { %>
+          <div class="card__section" id="orders-range"<%= has("orders") ? "" : " hidden" %>>
+            <fieldset class="fieldset">
+              <legend class="fieldset__legend">Orders date range</legend>
+              <div class="radio-row">
+                <label class="check"><input type="radio" <%- radio("orders_range", "all", options.orders_range) %>><span>All orders</span></label>
+                <label class="check"><input type="radio" <%- radio("orders_range", "range", options.orders_range) %>><span>From</span></label>
+                <input class="input input--sm" type="date" name="orders_from" aria-label="From date" value="<%= options.orders_from || "" %>">
+                <span class="muted">to</span>
+                <input class="input input--sm" type="date" name="orders_to" aria-label="To date" value="<%= options.orders_to || "" %>">
+                <span class="muted" style="font-size:12.5px">(empty = today)</span>
+              </div>
+            </fieldset>
+          </div>
+        <% } %>
+
+      <% } else if (step === 4) { %>
+        <%# ------------------------------------------------ 4 Options %>
+        <div class="card__section">
+          <h2 class="wizard-title">Migration options</h2>
+          <p class="wizard-sub">The defaults suit most stores.</p>
+        </div>
+        <div class="card__section">
+          <div class="grid grid--2" style="gap:24px">
+            <% if (has("products")) { %>
+              <fieldset class="fieldset">
+                <legend class="fieldset__legend">Products</legend>
+                <div class="radio-row"><span class="radio-row__label">Status in Shopify</span>
+                  <label class="check"><input type="radio" <%- radio("product_status", "same", options.product_status) %>>Same as source</label>
+                  <label class="check"><input type="radio" <%- radio("product_status", "draft", options.product_status) %>>All draft</label>
+                </div>
+                <div class="radio-row"><span class="radio-row__label">If SKU already exists</span>
+                  <label class="check"><input type="radio" <%- radio("sku_exists", "skip", options.sku_exists) %>>Skip</label>
+                  <label class="check"><input type="radio" <%- radio("sku_exists", "update", options.sku_exists) %>>Update</label>
+                </div>
+                <div class="radio-row"><span class="radio-row__label">More than 3 attributes</span>
+                  <label class="check"><input type="radio" <%- radio("extra_attributes", "skip", options.extra_attributes) %>>Skip &amp; report</label>
+                  <label class="check"><input type="radio" <%- radio("extra_attributes", "merge", options.extra_attributes) %>>Merge extra</label>
+                </div>
+                <label class="check" style="margin-top:12px"><input type="checkbox" name="publish_online_store" <%= options.publish_online_store ? "checked" : "" %>>
+                  <span class="check__text"><span class="check__label">Publish to Online Store</span><span class="check__help">Products and collections show in your storefront straight away.</span></span>
+                </label>
+              </fieldset>
+            <% } %>
+
+            <% if (has("customers") || has("orders")) { %>
+              <fieldset class="fieldset">
+                <legend class="fieldset__legend">Customers &amp; orders</legend>
+                <% if (has("customers")) { %>
+                  <div class="radio-row"><span class="radio-row__label">If email already exists</span>
+                    <label class="check"><input type="radio" <%- radio("email_exists", "skip", options.email_exists) %>>Skip</label>
+                    <label class="check"><input type="radio" <%- radio("email_exists", "update", options.email_exists) %>>Update</label>
+                  </div>
+                  <label class="check" style="margin-top:12px"><input type="checkbox" name="send_invites" <%= options.send_invites ? "checked" : "" %>>
+                    <span class="check__text"><span class="check__label">Send account invite emails</span><span class="check__help">Passwords cannot be moved; customers set a new one.</span></span>
+                  </label>
+                <% } %>
+                <% if (has("orders")) { %>
+                  <label class="check"><input type="checkbox" name="keep_order_numbers" <%= options.keep_order_numbers ? "checked" : "" %>>
+                    <span class="check__text"><span class="check__label">Keep original order numbers</span><span class="check__help">Order #1045 stays #1045 in Shopify.</span></span>
+                  </label>
+                  <label class="check"><input type="checkbox" name="silent_orders" <%= options.silent_orders !== false ? "checked" : "" %>>
+                    <span class="check__text"><span class="check__label">Do not email customers about imported orders</span></span>
+                  </label>
+                <% } %>
+              </fieldset>
+            <% } %>
+
+            <% if (has("pages") || has("posts")) { %>
+              <fieldset class="fieldset">
+                <legend class="fieldset__legend">Pages &amp; blog posts</legend>
+                <div class="radio-row"><span class="radio-row__label">Visibility</span>
+                  <label class="check"><input type="radio" <%- radio("page_status", "same", options.page_status) %>>Same as source</label>
+                  <label class="check"><input type="radio" <%- radio("page_status", "hidden", options.page_status) %>>All hidden</label>
+                </div>
+              </fieldset>
+            <% } %>
+          </div>
+        </div>
+
+        <% if (has("orders")) { %>
+          <div class="card__section">
+            <h3 class="fieldset__legend">Order status mapping</h3>
+            <div class="table-wrap" style="border-radius:8px;box-shadow:inset 0 0 0 1px var(--line)">
+              <table class="table">
+                <thead><tr><th>WooCommerce</th><th>Shopify payment</th><th>Shopify fulfilment</th></tr></thead>
+                <tbody>
+                  <% Object.keys(options.order_status_map).forEach(function (status) { var row = options.order_status_map[status]; %>
+                    <tr>
+                      <td><code><%= status %></code></td>
+                      <td><select class="select select--sm" name="map.<%= status %>.payment" aria-label="<%= status %> payment">
+                        <% paymentStatuses.forEach(function (s) { %><option value="<%= s %>" <%= row.payment === s ? "selected" : "" %>><%= s.charAt(0) + s.slice(1).toLowerCase().replace("_", " ") %></option><% }); %>
+                      </select></td>
+                      <td><select class="select select--sm" name="map.<%= status %>.fulfilment" aria-label="<%= status %> fulfilment">
+                        <% fulfilmentStatuses.forEach(function (s) { %><option value="<%= s %>" <%= row.fulfilment === s ? "selected" : "" %>><%= s.charAt(0) + s.slice(1).toLowerCase() %></option><% }); %>
+                      </select></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+
+      <% } else { %>
+        <%# ------------------------------------------------ 5 Review %>
+        <div class="card__section">
+          <h2 class="wizard-title">Ready to migrate</h2>
+        </div>
+        <div class="card__section">
+          <div class="grid grid--2" style="gap:16px;align-items:start">
+            <div class="kv">
+              <div><div class="kv__label">From</div><div class="kv__value"><%= platform.name %> · <%= h.host(connection.base_url) %></div></div>
+              <div><div class="kv__label">To</div><div class="kv__value"><%= shop %></div></div>
+              <div><div class="kv__label">Data</div><div class="kv__value">
+                <%= chosen.map(function (key) {
+                      return key === "redirects" ? "Redirects" : h.entityLabel(key) + " " + h.number(review.estimate[key] || 0);
+                    }).join(" · ") %>
+                <% if (has("orders") && options.orders_range === "range") { %><div class="muted" style="font-weight:500;font-size:12.5px">Orders from <%= options.orders_from %> to <%= options.orders_to || "today" %></div><% } %>
+              </div></div>
+              <div>
+                <div class="kv__label">Options</div>
+                <div class="kv__value" style="font-weight:500">
+                  <% var notes = [];
+                     if (has("products")) notes.push(options.product_status === "draft" ? "Products as draft" : "Product status as source", options.sku_exists === "update" ? "update existing SKUs" : "skip existing SKUs");
+                     if (has("customers")) notes.push(options.send_invites ? "invite customers" : "no invite emails");
+                     if (has("orders")) notes.push(options.silent_orders !== false ? "no order emails" : "send order emails");
+                  %>
+                  <%= notes.join(" · ") || "Defaults" %>
+                  <button class="link" type="button" data-navigate="/migrations/<%= migration.id %>?step=4" style="margin-left:4px">Change</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="box-shadow:inset 0 0 0 1px var(--line)">
+              <div class="stat">
+                <span class="stat__label">Total records</span>
+                <span class="stat__value"><%= h.number(review.total) %></span>
+                <% if (review.block) { %>
+                  <span class="stat__note stat__note--critical" style="display:flex;gap:4px"><%- include("../partials/icon", { name: "alert", size: 14 }) %> <%= review.block %></span>
+                <% } else { %>
+                  <span class="stat__note" style="color:var(--success);display:flex;gap:4px;align-items:center"><%- include("../partials/icon", { name: "check", size: 14 }) %>
+                    Fits your <%= limits.name %> plan<%= limits.unlimited ? "" : " (" + h.number(limits.remaining) + " remaining this month)" %></span>
+                <% } %>
+                <span class="stat__note">Estimated time: <%= review.eta %></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card__section">
+          <div class="banner banner--brand">
+            <%- include("../partials/icon", { name: "sparkle" }) %>
+            <div class="banner__body"><strong>Try it first:</strong> a free demo moves <%= demoLimit %> of each (<%= h.number(review.demoTotal) %> records) so you can check them in Shopify. It never counts against your plan, and you can delete it with one click.</div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="wizard-footer">
+        <button class="btn btn--plain btn--critical-plain" type="button" style="color:var(--critical)"
+          data-post="/migrations/<%= migration.id %>/discard" data-then="/migrations"
+          data-confirm="Discard this draft?\n\nNothing has been migrated yet, so nothing is lost." data-confirm-label="Discard" data-destructive>
+          Discard
+        </button>
+        <div class="wizard-footer__actions">
+          <% if (step > 1) { %>
+            <button class="btn" type="button" data-navigate="/migrations/<%= migration.id %>?step=<%= step - 1 %>">Back</button>
+          <% } %>
+          <% if (step < 5) { %>
+            <button class="btn btn--primary" type="submit" id="continue" <%= step === 2 && !connected ? "disabled" : "" %>>Continue</button>
+          <% } else { %>
+            <button class="btn" type="button" data-post="/migrations/<%= migration.id %>/begin" data-body='{"type":"demo"}'>
+              <%- include("../partials/icon", { name: "sparkle", size: 16 }) %> Run free demo
+            </button>
+            <% if (review.block) { %>
+              <button class="btn btn--primary" type="button" data-navigate="/plans">Upgrade plan</button>
+            <% } else { %>
+              <button class="btn btn--primary" type="button" data-post="/migrations/<%= migration.id %>/begin" data-body='{"type":"full"}'
+                data-confirm="Begin the full migration?\n\n<%= h.number(review.total) %> records will be created in <%= shop %>. It runs in the background — you can close this page."
+                data-confirm-label="Begin migration">
+                Begin full migration
+              </button>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+    </form>
+
+    <p class="footnote"><%- include("../partials/icon", { name: "lock", size: 14 }) %> Keys are encrypted at rest. Your data is never stored in our database — only counts and ID pairs.</p>
+  </main>
+
+  <script>
+    (function () {
+      var form = document.getElementById("wizard");
+      var step = Number(form.dataset.step);
+      var id = form.dataset.id;
+      var base = "/migrations/" + id;
+
+      function values() {
+        var data = { step: step };
+        if (step === 1) {
+          var chosen = form.querySelector("input[name=platform]:checked");
+          data.platform = chosen ? chosen.value : "";
+        }
+        if (step === 3) {
+          data.entities = Array.prototype.map.call(form.querySelectorAll("input[name=entities]:checked"), function (box) { return box.value; });
+          var range = form.querySelector("input[name=orders_range]:checked");
+          data.orders_range = range ? range.value : "all";
+          data.orders_from = (form.querySelector("[name=orders_from]") || {}).value || "";
+          data.orders_to = (form.querySelector("[name=orders_to]") || {}).value || "";
+        }
+        if (step === 4) {
+          data.order_status_map = {};
+          Array.prototype.forEach.call(form.elements, function (field) {
+            if (!field.name) return;
+            if (field.name.indexOf("map.") === 0) {
+              var parts = field.name.split(".");
+              data.order_status_map[parts[1]] = data.order_status_map[parts[1]] || {};
+              data.order_status_map[parts[1]][parts[2]] = field.value;
+            } else if (field.type === "checkbox") {
+              data[field.name] = field.checked;
+            } else if (field.type === "radio") {
+              if (field.checked) data[field.name] = field.value;
+            }
+          });
+          // Unrendered sections keep their defaults on the server.
+          ["publish_online_store", "send_invites", "keep_order_numbers", "silent_orders"].forEach(function (name) {
+            if (!(name in data)) data[name] = <%- json(options) %>[name];
+          });
+        }
+        return data;
+      }
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        window.appClearError();
+        var button = document.getElementById("continue");
+        if (!button || button.disabled) return;
+        try {
+          var result = await window.appPostJson(base + "/wizard", values(), button);
+          window.appNavigate(base + "?step=" + result.next);
+        } catch (error) {
+          window.appPageError(error.message);
+        }
+      });
+
+      /* ---- step 1: choosing a tile enables Continue ---- */
+      if (step === 1) {
+        var cont = document.getElementById("continue");
+        var update = function () { cont.disabled = !form.querySelector("input[name=platform]:checked"); };
+        form.addEventListener("change", update);
+        update();
+      }
+
+      /* ---- step 2: test connection ---- */
+      var test = document.getElementById("test-connection");
+      if (test) {
+        var scan = document.getElementById("scan");
+        var escape = function (text) { var div = document.createElement("div"); div.textContent = text; return div.innerHTML; };
+
+        test.addEventListener("click", async function () {
+          window.appClearError();
+          var body = {};
+          ["base_url", "consumer_key", "consumer_secret", "username", "app_password"].forEach(function (name) {
+            var field = form.querySelector("[name=" + name + "]");
+            if (field) body[name] = field.value.trim();
+          });
+          if (!body.base_url) {
+            window.appPageError("Enter your store's address first.");
+            form.querySelector("[name=base_url]").focus();
+            return;
+          }
+          scan.innerHTML = '<div class="scan__placeholder"><div><span class="btn is-loading" style="box-shadow:none;background:none;width:24px"></span><p>Connecting and counting your data…<br><span style="font-size:12.5px">This can take a few seconds on slower hosting.</span></p></div></div>';
+          try {
+            var result = await window.appPostJson(base + "/connect", body, test);
+            scan.innerHTML =
+              '<div class="muted" style="font-size:12.5px">Connection result</div>' +
+              '<div class="scan__status scan__status--ok">✓ Connected — ' + escape(result.version || "") + '</div>' +
+              '<div class="muted" style="margin-top:6px;font-size:12.5px">We found in your store:</div>' +
+              '<ul class="scan__list">' + result.counts.map(function (row) {
+                return "<li><span>" + escape(row.label) + "</span><strong>" + row.count.toLocaleString("en-US") + "</strong></li>";
+              }).join("") + "</ul>";
+            ["consumer_key", "consumer_secret", "app_password"].forEach(function (name) {
+              var field = form.querySelector("[name=" + name + "]");
+              if (field) { field.value = ""; field.placeholder = name === "consumer_key" ? result.hint + "  (saved)" : "(saved)"; }
+            });
+            form.querySelector("[name=base_url]").value = result.base_url;
+            document.getElementById("continue").disabled = false;
+            window.appToast("Connected");
+          } catch (error) {
+            scan.innerHTML = '<div class="muted" style="font-size:12.5px">Connection result</div><div class="scan__status scan__status--error">✕ Could not connect</div><p style="margin-top:8px">' + escape(error.message) + "</p>";
+            document.getElementById("continue").disabled = true;
+          }
+        });
+      }
+
+      /* ---- step 3: orders pull in products + customers; the date range follows orders ---- */
+      if (step === 3) {
+        var boxes = function (key) { return form.querySelector("input[name=entities][value=" + key + "]"); };
+        var range = document.getElementById("orders-range");
+        form.addEventListener("change", function (event) {
+          var orders = boxes("orders");
+          if (event.target === orders && orders.checked) {
+            ["products", "customers"].forEach(function (key) { var box = boxes(key); if (box && !box.disabled) box.checked = true; });
+          }
+          if (orders && orders.checked && ["products", "customers"].some(function (key) { var box = boxes(key); return box && event.target === box && !box.checked; })) {
+            orders.checked = false;
+            window.appToast("Orders need their products and customers, so Orders was unticked too.");
+          }
+          if (range) range.hidden = !(orders && orders.checked);
+          if (event.target.name === "orders_from" || event.target.name === "orders_to") {
+            var r = form.querySelector("input[name=orders_range][value=range]");
+            if (r) r.checked = true;
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
